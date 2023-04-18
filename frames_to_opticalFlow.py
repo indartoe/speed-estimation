@@ -6,7 +6,18 @@ def convertToOptical(prev_image, curr_image):
     prev_image_gray = cv2.cvtColor(prev_image, cv2.COLOR_BGR2GRAY)
     curr_image_gray = cv2.cvtColor(curr_image, cv2.COLOR_BGR2GRAY)
 
-    flow = cv2.calcOpticalFlowFarneback(prev_image_gray, curr_image_gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+    prev_image_gray = cv2.equalizeHist(prev_image_gray)
+    curr_image_gray = cv2.equalizeHist(curr_image_gray)
+
+    # hsv = np.zeros(prev_image.shape)
+    # # set saturation
+    # hsv[:,:,1] = cv2.cvtColor(curr_image, cv2.COLOR_RGB2HSV)[:,:,1]
+
+    flow = cv2.calcOpticalFlowFarneback(prev_image_gray, curr_image_gray, None, 0.5, 3, 10, 5, 3, 1.1, 0)
+    # lk_params = dict(winSize = (21, 21),
+	# 						  maxLevel = 2,
+	# 						  criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.01))
+    # flow = cv2.calcOpticalFlowPyrLK(prev_image_gray, curr_image_gray, None, None, lk_params)
     # flow = cv2.calcOpticalFlowFarneback(prev_image_gray, curr_image_gray, None, 0.5, 2, 15, 2, 5, 1.2, 0)
 
     hsv = np.zeros_like(prev_image)
