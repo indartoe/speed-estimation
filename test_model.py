@@ -1,4 +1,4 @@
-from model7 import CNNModel
+from model6 import CNNModel
 import cv2, json, os
 import sys
 import time
@@ -10,10 +10,13 @@ import time
 import ffmpeg
 import xlsxwriter 
 import math
+from statistics import mean
+from sklearn.metrics import r2_score
+import pandas as pd
 
 PATH_DATA_FOLDER = './data/'
 PATH_TEST_LABEL = PATH_DATA_FOLDER +  'test.txt'
-PATH_TEST_VIDEO = PATH_DATA_FOLDER + 'test.mp4'
+PATH_TEST_VIDEO = PATH_DATA_FOLDER + 'train.mp4'
 PATH_TEST_VIDEO_OUTPUT = PATH_DATA_FOLDER + 'test_output.mp4'
 PATH_COMBINED_TEST_VIDEO_OUTPUT = PATH_DATA_FOLDER + 'combined_test_output.mp4'
 PATH_TEST_IMAGES_FOLDER = PATH_DATA_FOLDER +  'test_images/'
@@ -37,7 +40,8 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
     t0 = time.time()
     predicted_labels = []
     
-    test_folder = PATH_DATA_FOLDER + 'test/'
+    # test_folder = PATH_DATA_FOLDER + 'test/'
+    test_folder = None
     test_folder_output = PATH_DATA_FOLDER + 'test_output/'
     test_folder_output_file = PATH_DATA_FOLDER + 'test_output_file/'
 
@@ -254,6 +258,9 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
         flow_image_bgr_prev2 =  None
         flow_image_bgr_prev3 =  None
         flow_image_bgr_prev4 =  None
+        avgAccuracy = []
+        avgMae = []
+        avgRmse = []
         for dir in os.listdir(os.path.join(PATH_TEST_IMAGES_FOLDER)):
             t1 = time.time()
             predicted_labels = []
@@ -327,9 +334,12 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
                 #CHOOSE IF WE WANT TO TEST WITH ONLY OPTICAL FLOW OR A COMBINATION OF VIDEO AND OPTICAL FLOW
                 # combined_image_test = cv2.resize(combined_image, (0,0), fx=0.5, fy=0.5)
                 # combined_image_test = cv2.resize(combined_image_test, (640, 480))
-                combined_image_test = cv2.resize(combined_image_test, (320, 240), fx=0.5, fy=0.5)
+                combined_image_test = cv2.cvtColor(combined_image_test, cv2.COLOR_BGR2GRAY)
+                combined_image_test = cv2.resize(combined_image_test, (256, 256), fx=0.5, fy=0.5)
+                
 
-                combined_image_test = combined_image_test.reshape(1, combined_image_test.shape[0], combined_image_test.shape[1], combined_image_test.shape[2])
+                # combined_image_test = combined_image_test.reshape(1, combined_image_test.shape[0], combined_image_test.shape[1], combined_image_test.shape[2])
+                combined_image_test = combined_image_test.reshape(1, combined_image_test.shape[0], combined_image_test.shape[1])
 
                 prediction = model.predict(combined_image_test)
                 predicted_labels.append(prediction[0][0])
@@ -385,6 +395,9 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
             arrAcuuracy = []
             arrErrors = []
             arrSquaredErrors = []
+            arrGroundTruth = []
+            arrPredicted = []
+            
             # if not os.path.exists(os.path.join(PATH_VELOCITY, file.split(".")[0] + ".txt")):
             if not os.path.exists(os.path.join(PATH_VELOCITY, dir + ".txt")):
                 continue
@@ -415,6 +428,8 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
                     sheet.write(row, 3, accuracy)
                     row += 1
 
+                    arrGroundTruth.append(float(groundTruthVelocity))
+                    arrPredicted.append(predictedVelocity)
                     arrAcuuracy.append(accuracy)
                     arrErrors.append(abs(float(groundTruthVelocity) - predictedVelocity))
                     arrSquaredErrors.append(pow(float(groundTruthVelocity) - predictedVelocity, 2))
@@ -432,14 +447,266 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
             sheet.write(row, 6, sum(arrSquaredErrors) / len(arrSquaredErrors))
             sheet.write(row, 7, "Root Mean Square Error")
             sheet.write(row, 8, math.sqrt(sum(arrSquaredErrors) / len(arrSquaredErrors)))
+
+            avgAccuracy.append(finalAccuracy)
+            avgMae.append(finalError)
+            avgRmse.append(math.sqrt(sum(arrSquaredErrors) / len(arrSquaredErrors)))
             
             # outAccuracy.write("{0}:{1};ground truth:{2};predicted velocity:{3}\n".format(file.split(".")[0], str(finalAccuracy), str(groundTruthVelocity), str(predictedVelocity)))
+
+        sheet = book.add_worksheet("results")   
+        sheet.write(0, 0, "Accuracy")
+        sheet.write(0, 1, "MAE")
+        sheet.write(0, 2, "RMSE")
+        sheet.write(0, 3, "RSquared")
+        score = r2_score(arrGroundTruth, arrPredicted)
+        RSquareScore = score *100
+        cursor = 0
+        rowSheet = 1
+        for accuracy in avgAccuracy:
+            sheet.write(rowSheet, 0, accuracy)
+            sheet.write(rowSheet, 1, avgMae[cursor])
+            sheet.write(rowSheet, 2, avgRmse[cursor])
+            sheet.write(rowSheet, 3, RSquareScore)
+            cursor += 1
+            rowSheet += 1
+
+        sheet.write(rowSheet, 0, mean(avgAccuracy))
+        sheet.write(rowSheet, 1, mean(avgMae))
+        sheet.write(rowSheet, 2, mean(avgRmse))
+
         print("finish")
         book.close()
         '''
         END:: KITTI TESTING
         '''
+    #COMMA AI TESTING
     else:
+        image_folder_test_comma_ai = True
+        if image_folder_test_comma_ai == True:
+            book = xlsxwriter.Workbook(PATH_DATA_FOLDER + 'test_accuracy.xlsx')  
+            
+            count =0
+            prev_frame = None
+            flow_image_bgr_prev1 =  None
+            flow_image_bgr_prev2 =  None
+            flow_image_bgr_prev3 =  None
+            flow_image_bgr_prev4 =  None
+            avgAccuracy = []
+            avgMae = []
+            avgRmse = []
+            t1 = time.time()
+            predicted_labels = []
+            for testFile in os.listdir(os.path.join(PATH_TEST_IMAGES_FOLDER)):
+            # for file in files:
+                
+                next_frame = cv2.imread(os.path.join(PATH_TEST_IMAGES_FOLDER, testFile))
+                if np.any(prev_frame == None):
+                    prev_frame = next_frame
+                    hsv = np.zeros_like(prev_frame)
+
+                    predicted_labels.append(0.0)
+
+                    flow_image_bgr_prev1 =  np.zeros_like(prev_frame)
+                    flow_image_bgr_prev2 =  np.zeros_like(prev_frame)
+                    flow_image_bgr_prev3 =  np.zeros_like(prev_frame)
+                    flow_image_bgr_prev4 =  np.zeros_like(prev_frame)
+                    continue
+                
+                
+
+                '''
+                Get Speed limit
+                ##-------Get Max speed limit----------------###
+                api = overpy.Overpass(retry_timeout=10)
+                ##-------Get Max speed limit----------------###
+                maxspeed = 0
+                # for file in os.listdir('data/train'):
+                #     if(file == '0a3bb2d8-c195d91e.json'):
+                #         full_filename = "%s/%s" % ('data/train', file)
+                #         file_found = False
+                #         with open(full_filename,'r') as fi:
+                #             jsonfile = json.load(fi)
+                #             for i in jsonfile['locations']:
+                #                 result = api.query("""way[maxspeed](around:25.0,""" + str(i.get('latitude')) + """,""" + str(i.get('longitude')) + """);(._;>;);out body;""")
+                #                 time.sleep(5.0)
+                #                 if(len(result.ways) > 0):
+                #                     if (result.ways[0] is not None):
+                #                         if(result.ways[0].tags.get("maxspeed","n/a") != "n/a"):
+                #                             result_maxspeed = result.ways[0].tags.get("maxspeed","0")
+                #                             maxspeed = int(result_maxspeed.split()[0]) * 0.44704
+                #                             file_found = True
+                #                             break
+                #             if(file_found == True):
+                #                 break
+                    ###-------End of speedlimit-------###
+                '''
+                    
+                font                   = cv2.FONT_HERSHEY_SIMPLEX
+                place = (50,50)
+                fontScale              = 1
+                fontColor              = (255,255,255)
+                lineType               = 2
+
+                flow_image_bgr_next = convertToOptical(prev_frame, next_frame)
+                flow_image_bgr = (flow_image_bgr_prev1 + flow_image_bgr_prev2 +flow_image_bgr_prev3 +flow_image_bgr_prev4 + flow_image_bgr_next)/4
+
+                curr_image = cv2.cvtColor(next_frame, cv2.COLOR_BGR2RGB)
+
+                combined_image_save = 0.1*curr_image + flow_image_bgr
+
+                #CHOOSE IF WE WANT TO TEST WITH ONLY OPTICAL FLOW OR A COMBINATION OF VIDEO AND OPTICAL FLOW
+                combined_image = flow_image_bgr
+                # combined_image = combined_image_save
+
+                combined_image_test = cv2.normalize(combined_image, None, alpha=-1, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+                # plt.imshow(combined_image)
+                # plt.show()
+
+                #CHOOSE IF WE WANT TO TEST WITH ONLY OPTICAL FLOW OR A COMBINATION OF VIDEO AND OPTICAL FLOW
+                # combined_image_test = cv2.resize(combined_image, (0,0), fx=0.5, fy=0.5)
+                # combined_image_test = cv2.resize(combined_image_test, (640, 480))
+                combined_image_test = cv2.cvtColor(combined_image_test, cv2.COLOR_BGR2GRAY)
+                combined_image_test = cv2.resize(combined_image_test, (256, 256), fx=0.5, fy=0.5)
+                
+
+                # combined_image_test = combined_image_test.reshape(1, combined_image_test.shape[0], combined_image_test.shape[1], combined_image_test.shape[2])
+                combined_image_test = combined_image_test.reshape(1, combined_image_test.shape[0], combined_image_test.shape[1])
+
+                prediction = model.predict(combined_image_test)
+                predicted_labels.append(prediction[0][0])
+
+                # print(combined_image.shape, np.mean(flow_image_bgr), prediction[0][0])
+                # fontColor              = (255,255,255)
+                ### Check whether the speed is above speed limit
+                # if(maxspeed > 0):
+                #     if(prediction[0][0] > maxspeed):
+                #         fontColor = (136,8,8)
+                #         print("Exceed max speed")
+
+                # cv2.putText(next_frame, str(prediction[0][0]), place, font, fontScale,fontColor,lineType)
+                # cv2.putText(combined_image_save, str(prediction[0][0]), place, font, fontScale,fontColor,lineType)
+
+                # video_writer.write(next_frame)
+                # video_writer_combined.write(combined_image_save.astype('uint8'))
+
+                prev_frame = next_frame
+                flow_image_bgr_prev4 = flow_image_bgr_prev3
+                flow_image_bgr_prev3 = flow_image_bgr_prev2
+                flow_image_bgr_prev2 = flow_image_bgr_prev1
+                flow_image_bgr_prev1 = flow_image_bgr_next
+
+                count +=1
+                # sys.stdout.write('\rprocessed frames: %d of %d' % (count, num_frames))
+
+            t2 = time.time()
+            # video_reader.release()
+            # video_writer.release()
+            # video_writer_combined.release()
+            print(' Prediction completed !')
+            print(' Time Taken:', (t2 - t1), 'seconds')
+
+            predicted_labels[0] = predicted_labels[1]
+
+
+            #calculate the accuracy of the prediction
+            #Get how many frames need to be removed first to syncronize the calculation
+            # framesRemoved = 0
+            # with open(os.path.join(PATH_DATA_FOLDER, PATH_VIDEO_INFORMATION),'r') as fi:
+            #     differenceFrameLines = fi.readlines()
+            #     for line in differenceFrameLines:
+            #         if line.split(" ")[0] == testFile.split(".")[0]:
+            #             framesRemoved = abs(int(line.split(" ")[2]))
+            #             break
+
+            #open the velocity file
+            # testPredictedVelocity = predicted_labels[]
+            cursor = 0
+            arrAcuuracy = []
+            arrErrors = []
+            arrSquaredErrors = []
+            arrGroundTruth = []
+            arrPredicted = []
+            # if not os.path.exists(os.path.join(PATH_VELOCITY, file.split(".")[0] + ".txt")):
+
+            sheet = book.add_worksheet("comma.ai")   
+            sheet.write(0, 0, "Ground Truth")
+            sheet.write(0, 1, "Predicted")
+            sheet.write(0, 2, "Error")
+            sheet.write(0, 3, "Accuracy")
+            row = 1
+            with open('./data/test.txt','r') as fiVelocity:
+                groundTruthVelocities = fiVelocity.read().split()
+                for groundTruthVelocity in groundTruthVelocities:
+                    if len(groundTruthVelocities) - 1 <= cursor:
+                        break
+                    predictedVelocity = predicted_labels[cursor]
+                    cursor += 1 
+
+                    accuracy = 0 
+                    if float(groundTruthVelocity) > 0:
+                        accuracy = 1 - (abs(float(groundTruthVelocity) - predictedVelocity)/ float(groundTruthVelocity))
+
+                    if accuracy < 0:
+                        accuracy = 0
+                    sheet.write(row, 0, groundTruthVelocity)
+                    sheet.write(row, 1, predictedVelocity)
+                    sheet.write(row, 2, abs(float(groundTruthVelocity) - predictedVelocity))
+                    sheet.write(row, 3, accuracy)
+                    row += 1
+
+                    arrGroundTruth.append(float(groundTruthVelocity))
+                    arrPredicted.append(predictedVelocity)
+                    arrAcuuracy.append(accuracy)
+                    arrErrors.append(abs(float(groundTruthVelocity) - predictedVelocity))
+                    arrSquaredErrors.append(pow(float(groundTruthVelocity) - predictedVelocity, 2))
+
+            finalAccuracy = sum(arrAcuuracy)/len(arrAcuuracy)
+            finalError = sum(arrErrors) / len(arrErrors)
+            
+            sheet.write(row, 2,"Average Accuracy")
+            sheet.write(row, 3, finalAccuracy)
+            sheet.write(row, 0,"mean Average Error")
+            sheet.write(row, 1, finalError)
+
+            #NEW:: Calculate MSE
+            sheet.write(row, 5, "Mean Square Error")
+            sheet.write(row, 6, sum(arrSquaredErrors) / len(arrSquaredErrors))
+            sheet.write(row, 7, "Root Mean Square Error")
+            sheet.write(row, 8, math.sqrt(sum(arrSquaredErrors) / len(arrSquaredErrors)))
+
+            avgAccuracy.append(finalAccuracy)
+            avgMae.append(finalError)
+            avgRmse.append(math.sqrt(sum(arrSquaredErrors) / len(arrSquaredErrors)))
+            
+            # outAccuracy.write("{0}:{1};ground truth:{2};predicted velocity:{3}\n".format(file.split(".")[0], str(finalAccuracy), str(groundTruthVelocity), str(predictedVelocity)))
+
+            sheet = book.add_worksheet("results")   
+            sheet.write(0, 0, "Accuracy")
+            sheet.write(0, 1, "MAE")
+            sheet.write(0, 2, "RMSE")
+            sheet.write(0, 3, "RSquared")
+            score = r2_score(arrGroundTruth, arrPredicted)
+            RSquareScore = score *100
+            cursor = 0
+            rowSheet = 1
+            for accuracy in avgAccuracy:
+                sheet.write(rowSheet, 0, accuracy)
+                sheet.write(rowSheet, 1, avgMae[cursor])
+                sheet.write(rowSheet, 2, avgRmse[cursor])
+                sheet.write(rowSheet, 3, RSquareScore)
+                cursor += 1
+                rowSheet += 1
+
+            sheet.write(rowSheet, 0, mean(avgAccuracy))
+            sheet.write(rowSheet, 1, mean(avgMae))
+            sheet.write(rowSheet, 2, mean(avgRmse))
+            sheet.write(rowSheet, 3, RSquareScore)
+
+            print("finish")
+            book.close()
+            return
         #Changing the fps to 20
         # stream = ffmpeg.input(video_input_path)
         # stream = stream.filter('fps', fps = 20, round = 'up')
@@ -448,7 +715,7 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
         # ffmpeg.run(stream)
         # video_reader = cv2.VideoCapture('tmp/temp.mp4')
         #end of changing fps
-
+        # book = xlsxwriter.Workbook(PATH_DATA_FOLDER + 'test_accuracy.xlsx')  
         video_reader = cv2.VideoCapture(video_input_path)
         # video_reader.set(cv2.CAP_PROP_FPS, 20)
 
@@ -504,6 +771,13 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
         fontColor              = (255,255,255)
         lineType               = 2
 
+        # sheet = book.add_worksheet(dir)   
+        # sheet.write(0, 0, "Ground Truth")
+        # sheet.write(0, 1, "Predicted")
+        # sheet.write(0, 2, "Error")
+        # sheet.write(0, 3, "Accuracy")
+        # row = 1
+        
         count =0
         while True:
             ret, next_frame = video_reader.read()
@@ -529,9 +803,12 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
             #CHOOSE IF WE WANT TO TEST WITH ONLY OPTICAL FLOW OR A COMBINATION OF VIDEO AND OPTICAL FLOW
             # combined_image_test = cv2.resize(combined_image, (0,0), fx=0.5, fy=0.5)
             # combined_image_test = cv2.resize(combined_image_test, (640, 480))
-            combined_image_test = cv2.resize(combined_image_test, (320, 240), fx=0.5, fy=0.5)
+            combined_image_test = cv2.cvtColor(combined_image_test, cv2.COLOR_BGR2GRAY)
+            combined_image_test = cv2.resize(combined_image_test, (256, 256), fx=0.5, fy=0.5)
+            # combined_image_test = cv2.resize(combined_image_test, (320, 240), fx=0.5, fy=0.5)
 
-            combined_image_test = combined_image_test.reshape(1, combined_image_test.shape[0], combined_image_test.shape[1], combined_image_test.shape[2])
+            # combined_image_test = combined_image_test.reshape(1, combined_image_test.shape[0], combined_image_test.shape[1], combined_image_test.shape[2])
+            combined_image_test = combined_image_test.reshape(1, combined_image_test.shape[0], combined_image_test.shape[1])
 
             prediction = model.predict(combined_image_test)
 
@@ -562,7 +839,59 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
             count +=1
             sys.stdout.write('\rprocessed frames: %d of %d' % (count, num_frames))
 
+        book = xlsxwriter.Workbook(PATH_DATA_FOLDER + 'test_accuracy.xlsx')  
+        cursor = 0
+        arrAcuuracy = []
+        arrErrors = []
+        arrSquaredErrors = []
+        arrGroundTruth = []
+        arrPredicted = []
+        sheet = book.add_worksheet("COMMA.AI")   
+        sheet.write(0, 0, "Ground Truth")
+        sheet.write(0, 1, "Predicted")
+        sheet.write(0, 2, "Error")
+        sheet.write(0, 3, "Accuracy")
+        row = 1
+        with open(os.path.join(PATH_DATA_FOLDER, "train.txt"),'r') as fiVelocity:
+            groundTruthVelocities = fiVelocity.read().split()
+            for groundTruthVelocity in groundTruthVelocities:
+                if len(groundTruthVelocities) - 1 <= cursor:
+                    break
+                predictedVelocity = predicted_labels[cursor]
+                cursor += 1 
 
+                accuracy = 0 
+                if float(groundTruthVelocity) > 0:
+                    accuracy = 1 - (abs(float(groundTruthVelocity) - predictedVelocity)/ float(groundTruthVelocity))
+
+                if accuracy < 0:
+                    accuracy = 0
+                sheet.write(row, 0, groundTruthVelocity)
+                sheet.write(row, 1, predictedVelocity)
+                sheet.write(row, 2, abs(float(groundTruthVelocity) - predictedVelocity))
+                sheet.write(row, 3, accuracy)
+                row += 1
+
+                arrGroundTruth.append(groundTruthVelocity)
+                arrPredicted.append(predictedVelocity)
+                arrAcuuracy.append(accuracy)
+                arrErrors.append(abs(float(groundTruthVelocity) - predictedVelocity))
+                arrSquaredErrors.append(pow(float(groundTruthVelocity) - predictedVelocity, 2))
+
+        finalAccuracy = sum(arrAcuuracy)/len(arrAcuuracy)
+        finalError = sum(arrErrors) / len(arrErrors)
+        
+        sheet.write(row, 2,"Average Accuracy")
+        sheet.write(row, 3, finalAccuracy)
+        sheet.write(row, 0,"mean Average Error")
+        sheet.write(row, 1, finalError)
+
+        #NEW:: Calculate MSE
+        sheet.write(row, 5, "Mean Square Error")
+        sheet.write(row, 6, sum(arrSquaredErrors) / len(arrSquaredErrors))
+        sheet.write(row, 7, "Root Mean Square Error")
+        sheet.write(row, 8, math.sqrt(sum(arrSquaredErrors) / len(arrSquaredErrors)))
+        
         t2 = time.time()
         video_reader.release()
         video_writer.release()
@@ -571,6 +900,10 @@ def predict_from_video(video_input_path, original_video_output_path, combined_vi
         print(' Time Taken:', (t2 - t1), 'seconds')
 
         predicted_labels[0] = predicted_labels[1]
+
+        book.close()
+        #END:: COMMA AI
+        
     print(' Time Taken:', (time.time() - t0), 'seconds')
     print("END::predicting speed video")
     return predicted_labels
@@ -591,8 +924,8 @@ if __name__ == '__main__':
     print('finish predicting videos in')
     print("--- %s seconds ---" % (time.time() - start_time))
 
-    with open(PATH_TEST_LABEL, mode="w") as outfile:
-        for label in predicted_labels:
-            outfile.write("%s\n" % str(label))
+    # with open(PATH_TEST_LABEL, mode="w") as outfile:
+    #     for label in predicted_labels:
+    #         outfile.write("%s\n" % str(label))
 
     print("--- %s seconds ---" % (time.time() - start_time))

@@ -346,7 +346,7 @@ def preprocess_data(video_input_path, flow_video_output_path, image_folder_path,
             #     sys.stdout.write('\rprocessed frames: %d of %d' % (count//2, num_frames))
             #     count += 1
             # else:
-            #     sys.stdout.write('\rprocessed frames: %d of %d' % (count, num_frames))
+            sys.stdout.write('\rprocessed frames: %d of %d' % (count, num_frames))
 
 
         t2 = time.time()
@@ -385,7 +385,7 @@ if __name__ == '__main__':
 
     # video_reader = cv2.VideoCapture(os.path.join(PATH_DATA_FOLDER, 'train.mp4'))
     # num_frames = video_reader.get(cv2.CAP_PROP_FRAME_COUNT)
-    preprocess_data(PATH_TRAIN_VIDEO, PATH_TRAIN_FLOW_VIDEO, PATH_TRAIN_IMAGES_FOLDER, PATH_TRAIN_IMAGES_FLOW_FOLDER, type='train', folder=PATH_DATA_FOLDER + PATH_FOLDER_TRAIN)
-    # preprocess_data(PATH_TRAIN_VIDEO, PATH_TRAIN_FLOW_VIDEO, PATH_TRAIN_IMAGES_FOLDER, PATH_TRAIN_IMAGES_FLOW_FOLDER, type='train', folder=None)
-    preprocess_data(PATH_TEST_VIDEO, PATH_TEST_FLOW_VIDEO, PATH_TEST_IMAGES_FOLDER, PATH_TEST_IMAGES_FLOW_FOLDER, type='test', folder=PATH_DATA_FOLDER + PATH_FOLDER_TEST)
-    # preprocess_data(PATH_TEST_VIDEO, PATH_TEST_FLOW_VIDEO, PATH_TEST_IMAGES_FOLDER, PATH_TEST_IMAGES_FLOW_FOLDER, type='test', folder=None)
+    # preprocess_data(PATH_TRAIN_VIDEO, PATH_TRAIN_FLOW_VIDEO, PATH_TRAIN_IMAGES_FOLDER, PATH_TRAIN_IMAGES_FLOW_FOLDER, type='train', folder=PATH_DATA_FOLDER + PATH_FOLDER_TRAIN)
+    preprocess_data(PATH_TRAIN_VIDEO, PATH_TRAIN_FLOW_VIDEO, PATH_TRAIN_IMAGES_FOLDER, PATH_TRAIN_IMAGES_FLOW_FOLDER, type='train', folder=None)
+    # preprocess_data(PATH_TEST_VIDEO, PATH_TEST_FLOW_VIDEO, PATH_TEST_IMAGES_FOLDER, PATH_TEST_IMAGES_FLOW_FOLDER, type='test', folder=PATH_DATA_FOLDER + PATH_FOLDER_TEST)
+    preprocess_data(PATH_TEST_VIDEO, PATH_TEST_FLOW_VIDEO, PATH_TEST_IMAGES_FOLDER, PATH_TEST_IMAGES_FLOW_FOLDER, type='test', folder=None)

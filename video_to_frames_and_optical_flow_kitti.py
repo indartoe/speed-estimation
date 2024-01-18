@@ -196,11 +196,10 @@ def preprocess_data(video_input_path, flow_video_output_path, image_folder_path,
             cv2.imwrite(image_path_out, next_frame)
             cv2.imwrite(flow_image_path_out, bgr_flow)
 
-            # video_writer.write(bgr_flow)
-
             prev_frame = next_frame
             count += 1
             
+        print("folder " + file + " has :" + str(count) + " file")
         t2 = time.time()
         print(' Time Taken:', (t2 - t1), 'seconds')
 
